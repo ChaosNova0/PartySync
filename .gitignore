@@ -12,3 +12,6 @@ tests/
 # Claude Code project files: kept on this PC, not on GitHub
 .claude/
 CLAUDE.md
+
+# Design and build notes: kept on this PC only
+docs/
