@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "Lua 5.1",
+  "workspace.ignoreDir": [".git", "tests", "mockup", "docs"],
+  "diagnostics.globals": [
+    "PartySyncDB",
+    "PartySyncFrame",
+    "PartySyncSharePopup",
+    "PartySyncMinimapButton",
+    "SLASH_PARTYSYNC1",
+    "SLASH_PARTYSYNC2",
+    "Questie",
+    "QuestieLoader",
+    "LibQuestieDB",
+    "issecretvalue"
+  ]
+}

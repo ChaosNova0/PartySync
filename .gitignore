@@ -1,0 +1,14 @@
+# Packaged builds (attach these to GitHub Releases instead)
+*.zip
+
+# OS clutter
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Headless tests: kept on this PC only
+tests/
+
+# Claude Code project files: kept on this PC, not on GitHub
+.claude/
+CLAUDE.md

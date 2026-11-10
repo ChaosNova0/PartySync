@@ -1,0 +1,8 @@
+{
+  "ignore": ["tests/", "mockup/", "docs/"],
+  "flavors": ["forever"],
+  "globals": {
+    "read": ["Questie", "QuestieLoader", "LibQuestieDB"],
+    "write": ["PartySyncDB", "PartySyncFrame", "PartySyncSharePopup", "PartySyncMinimapButton", "SLASH_PARTYSYNC1", "SLASH_PARTYSYNC2"]
+  }
+}

@@ -1,0 +1,12 @@
+* text=auto
+*.ttf binary
+.luarc.json export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
+.wowluarc.json export-ignore
+mockup/ export-ignore
+docs/ export-ignore
+tests/ export-ignore
+.claude/ export-ignore
+CLAUDE.md export-ignore
+*.tga binary
