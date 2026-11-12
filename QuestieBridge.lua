@@ -41,6 +41,10 @@
 --   QDB.Giver(questID) -> { name, kind = "npc"|"object"|"item", id, areaId, x, y,
 --                           zone, dir } or nil   (x, y are 0-100; dir "south-west"...)
 --   QDB.ZoneName(areaId), QDB.UiMapID(areaId), QDB.Direction(x, y)
+--   QDB.QuestZones(questID [, cachedOnly]) -> { [zoneName] = true }, count:
+--                   where the quest's mobs, objects, item drops and explore
+--                   spots are (nil: no database, or not worked out yet with
+--                   cachedOnly). The table is the cache's own: read it, don't change it.
 --   QDB.MyRaceMask(), QDB.MyClassMask()   our bits in requiredRaces / requiredClasses
 --   QDB.ShowOnMap(questID) -> ok, how ("pin" | "questie"), giver
 --   QDB.ParseMapText(text, into) -> pairs read, or nil (see "Zones and maps")
@@ -275,6 +279,47 @@ local SHAPES = {
     return { npcs = IDs(v[1]) or {}, objects = IDs(v[2]) or {}, items = IDs(v[3]) or {} }
   end,
   spawns = Spawns,
+  -- objectives: { creature, object, item, reputation, killCredit, spell }, where
+  -- creature / object / item are lists of { id, text, icon } and killCredit is a
+  -- list of { ids, baseId, baseText, icon } -> { npcs = {ids}, objects = {ids}, items = {ids} }
+  objectives = function(v)
+    if type(v) ~= "table" then return nil end
+    local out = { npcs = {}, objects = {}, items = {} }
+    local function Add(list, id)
+      if IsID(id) and #list < QDB.MAX_LIST then list[#list + 1] = id end
+    end
+    for slot, list in pairs({ [1] = out.npcs, [2] = out.objects, [3] = out.items }) do
+      local rows = v[slot]
+      if type(rows) == "table" then
+        for i = 1, math.min(#rows, QDB.MAX_LIST) do
+          if type(rows[i]) == "table" then Add(list, rows[i][1]) end
+        end
+      end
+    end
+    local credits = v[5]
+    if type(credits) == "table" then
+      for i = 1, math.min(#credits, QDB.MAX_LIST) do
+        local row = credits[i]
+        if type(row) == "table" then
+          Add(out.npcs, row[2])
+          if type(row[1]) == "table" then
+            for j = 1, math.min(#row[1], QDB.MAX_LIST) do Add(out.npcs, row[1][j]) end
+          end
+        end
+      end
+    end
+    return out
+  end,
+  -- triggerEnd: { text, { [areaId] = { { x, y }, ... } } } -> { areaIds }
+  trigger = function(v)
+    if type(v) ~= "table" or type(v[2]) ~= "table" then return nil end
+    local out = {}
+    for areaId in pairs(v[2]) do
+      if IsID(areaId) and #out < QDB.MAX_LIST then out[#out + 1] = areaId end
+    end
+    table.sort(out)
+    return #out > 0 and out or nil
+  end,
 }
 
 -- the shape each field we read should have (anything else reads as nil)
@@ -283,6 +328,7 @@ local FIELDS = {
   requiredRaces = "number", requiredClasses = "number",
   preQuestGroup = "ids", preQuestSingle = "ids", exclusiveTo = "ids", breadcrumbs = "ids",
   nextQuestInChain = "id", startedBy = "starters", spawns = "spawns", zoneID = "id",
+  objectives = "objectives", triggerEnd = "trigger", npcDrops = "ids", objectDrops = "ids",
 }
 
 function QDB.Field(kind, id, field)
@@ -376,6 +422,74 @@ function QDB.Giver(questID)
   local g = first or named
   Store("giver", questID, g or false)
   return g
+end
+
+------------------------------------------------------------------------
+-- Where a quest's work is done
+------------------------------------------------------------------------
+-- The quest log files some quests under the city that gave them (Un'Goro Soil
+-- sits under "Thunder Bluff"), so the heading alone can miss the zone you do
+-- the quest in. This looks up where the quest's mobs and objects are, where its
+-- items drop, and where an "explore" spot is.
+QDB.MAX_ZONE_SOURCES = 10 -- the most NPCs / objects looked at per objective list
+QDB.MAX_DROP_ZONES = 3    -- an item that drops in more zones than this (or from
+                          -- more than MAX_ZONE_SOURCES NPCs and objects) drops
+                          -- "everywhere" (cloth, say): it says nothing about
+                          -- where to go, so it's skipped
+QDB.MAX_QUEST_ZONES = 20  -- the most zones kept per quest
+
+-- QDB.QuestZones(questID [, cachedOnly]) -> { [zoneName] = true } (may be
+-- empty) and how many zones, or nil when there's no database to ask (or, with
+-- cachedOnly, when it hasn't been worked out yet). Cached for the session.
+function QDB.QuestZones(questID, cachedOnly)
+  if QDB.State() ~= "ready" or not IsID(questID) then return nil end
+  local hit = Cached("qzones", questID)
+  if hit ~= nil then return hit.zones, hit.count end
+  if cachedOnly then return nil end
+  local zones, count = {}, 0
+  local function AddArea(areaId)
+    if count >= QDB.MAX_QUEST_ZONES then return end
+    local name = QDB.ZoneName(areaId)
+    if name and not zones[name] then zones[name] = true count = count + 1 end
+  end
+  local function AddSpawner(kind, id)
+    local home = QDB.Field(kind, id, "zoneID")
+    if home then AddArea(home) end
+    for _, s in ipairs(QDB.Field(kind, id, "spawns") or {}) do AddArea(s.areaId) end
+  end
+  local function Each(list, fn)
+    for i = 1, math.min(#list, QDB.MAX_ZONE_SOURCES) do fn(list[i]) end
+  end
+  local obj = QDB.Field("quest", questID, "objectives")
+  if obj then
+    Each(obj.npcs, function(id) AddSpawner("npc", id) end)
+    Each(obj.objects, function(id) AddSpawner("object", id) end)
+    Each(obj.items, function(item)
+      local npcs = QDB.Field("item", item, "npcDrops") or {}
+      local objects = QDB.Field("item", item, "objectDrops") or {}
+      if #npcs + #objects > QDB.MAX_ZONE_SOURCES then return end
+      -- (where it drops, kept only if that's a few zones: see MAX_DROP_ZONES)
+      local found, n = {}, 0
+      local function Note(areaId)
+        local name = QDB.ZoneName(areaId)
+        if name and not found[name] then found[name] = areaId n = n + 1 end
+      end
+      local function Drops(kind, id)
+        local home = QDB.Field(kind, id, "zoneID")
+        if home then Note(home) end
+        for _, s in ipairs(QDB.Field(kind, id, "spawns") or {}) do Note(s.areaId) end
+      end
+      for _, id in ipairs(npcs) do Drops("npc", id) end
+      for _, id in ipairs(objects) do Drops("object", id) end
+      if n > QDB.MAX_DROP_ZONES then return end
+      for _, areaId in pairs(found) do AddArea(areaId) end
+    end)
+  end
+  for _, areaId in ipairs(QDB.Field("quest", questID, "triggerEnd") or {}) do AddArea(areaId) end
+  -- (a read failed part way: don't keep a half-read answer)
+  if QDB.state ~= "ready" then return nil end
+  Store("qzones", questID, { zones = zones, count = count })
+  return zones, count
 end
 
 ------------------------------------------------------------------------

@@ -41,6 +41,8 @@
 --     counts = { missing = 2, progress = 3, ready = 1 },
 --     synced = 2,    -- whole seconds since we last heard any party member, or nil
 --     alertDone = true,
+--     zonesPending = false, -- true: some quests' Questie zones aren't worked out
+--                           -- yet (they go by heading; the panel redraws soon)
 --   }
 -- Text in the table comes from other players: it has no "|" (Wire.lua took
 -- it out), but the panel should still pass it through ns.Escape for chat.
@@ -196,6 +198,9 @@ end
 local SOLO_TEXT = "You're not in a party. PartySync works in parties: join one to see everyone's quests."
 local RAID_TEXT = "PartySync works in parties. It's paused while you're in a raid."
 
+Model.ZONE_BUDGET = 15              -- new Questie zone lookups per build (see Build)
+Model.MAX_ZONE_CHOICES_PER_QUEST = 3 -- a quest done in more zones adds none to the dropdown
+
 function Model.Build()
   local settings = (ns.db and ns.db.settings) or ns.DEFAULTS.settings
   local mode = G.Mode()
@@ -226,10 +231,34 @@ function Model.Build()
   local all = (mode == "party") and Gather() or {}
   -- (the choices are the zones in MY quest log only, so the saved filter is
   -- never a name another player sent)
+  -- (a quest also counts for the zones Questie says its work is in: the log
+  -- files some quests under the city that gave them, see QDB.QuestZones)
+  -- Working one out can take many reads, so each build works out at most
+  -- Model.ZONE_BUDGET new ones; the rest go by heading for now and the panel
+  -- redraws soon to do the next lot.
+  local QDB = ns.QDB
+  local budget, pending = Model.ZONE_BUDGET, false
+  local function WorkZones(id)
+    if not (QDB and QDB.QuestZones) then return {}, 0 end
+    local z, n = QDB.QuestZones(id, true)
+    if z then return z, n end
+    if QDB.state ~= "ready" then return {}, 0 end
+    if budget <= 0 then pending = true return {}, 0 end
+    budget = budget - 1
+    z, n = QDB.QuestZones(id)
+    return z or {}, n or 0
+  end
   local zones, zoneList = {}, {}
-  for _, q in pairs(me.quests) do
-    local z = q.zone
+  local function AddChoice(z)
     if z ~= "" and not zones[z] then zones[z] = true zoneList[#zoneList + 1] = z end
+  end
+  for id, q in pairs(me.quests) do
+    AddChoice(q.zone)
+    -- (only quests done in a few zones add choices, so the dropdown stays short)
+    local wz, n = WorkZones(id)
+    if n <= Model.MAX_ZONE_CHOICES_PER_QUEST then
+      for z in pairs(wz) do AddChoice(z) end
+    end
   end
   if filter ~= "current" and filter ~= "all" and not zones[filter] then zoneList[#zoneList + 1] = filter end
   table.sort(zoneList)
@@ -248,7 +277,7 @@ function Model.Build()
   local myName = me.name or "You"
   for id, e in pairs(all) do
     local main = Main(e)
-    if not want or main.zone == want then
+    if not want or main.zone == want or WorkZones(id)[want] then
       if (e.mine and 1 or 0) + #e.others >= 2 then out.sharedCount = out.sharedCount + 1 end
       local base = { id = id, title = main.title, level = main.level,
                      color = Model.LevelColor(main.level, level), zone = main.zone }
@@ -292,6 +321,8 @@ function Model.Build()
   table.sort(out.missing, ByLevelTitle)
   table.sort(out.progress, ByLevelTitle)
   table.sort(out.ready, ByLevelTitle)
+  out.zonesPending = pending
+  if pending and ns.UI and ns.UI.RefreshSoon then ns.UI.RefreshSoon() end
   out.counts.missing, out.counts.progress, out.counts.ready = #out.missing, #out.progress, #out.ready
   return out
 end

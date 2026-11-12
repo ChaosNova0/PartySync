@@ -33,7 +33,7 @@
 --   "ALL_DONE"       (questID, title)   a quest is ready for everyone (Model.lua)
 
 local ADDON, ns = ...
-ns.VERSION = "0.1.0" -- keep equal to ## Version in PartySync.toc
+ns.VERSION = "0.1.1" -- keep equal to ## Version in PartySync.toc
 
 ------------------------------------------------------------------------
 -- Errors
@@ -415,7 +415,8 @@ end)
 function ns.CurrentZone()
   local zone = GetRealZoneText and GetRealZoneText()
   if type(zone) ~= "string" or ns.IsSecret(zone) then return "" end
-  return zone
+  -- (cut like quest log headings and Questie's zone names, so long names still match)
+  return (ns.Wire and ns.Wire.CleanLocal(zone, ns.Wire.MAX_ZONE)) or zone
 end
 
 ------------------------------------------------------------------------

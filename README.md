@@ -2,7 +2,7 @@
 
 **Your party's quests in one list, for WoW: Forever.**
 
-![Version](https://img.shields.io/badge/version-0.1.0-c9a26b) ![Client](https://img.shields.io/badge/client-WoW%3A%20Forever-555) ![Status](https://img.shields.io/badge/status-testing-orange)
+![Version](https://img.shields.io/badge/version-0.1.1-c9a26b) ![Client](https://img.shields.io/badge/client-WoW%3A%20Forever-555) ![Status](https://img.shields.io/badge/status-testing-orange)
 
 PartySync shows what everyone in your party is working on. You can see who still needs mobs or items, which quests your friends have that you don't, and what's ready to hand in. Everyone who wants to show up in the list needs PartySync installed.
 
