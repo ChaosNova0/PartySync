@@ -2,7 +2,7 @@
 ## Title: |cffdca77fParty|rSync
 ## Notes: Your party's quests in one list: who still needs what, what you're missing, and what's ready to hand in. Type /psync to open.
 ## Author: PartySync
-## Version: 0.1.1
+## Version: 0.1.2
 ## SavedVariables: PartySyncDB
 ## OptionalDeps: Questie, QuestieDB
 

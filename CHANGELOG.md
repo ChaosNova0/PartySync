@@ -12,6 +12,9 @@ Fixes from a full review, mostly to make party sync more forgiving.
 ### New
 - **`/psync debug`** turns on extra chat lines until you log out. They help when reporting a problem, especially if party members can't see each other's quests.
 
+### Good to know
+- It works with 0.1.x as normal, so party members on older versions can still sync with you.
+
 ### Install
 1. Close the game.
 2. Unzip so that `Interface\AddOns\PartySync\PartySync.toc` exists, replacing the old folder.

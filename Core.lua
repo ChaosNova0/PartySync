@@ -33,7 +33,7 @@
 --   "ALL_DONE"       (questID, title)   a quest is ready for everyone (Model.lua)
 
 local ADDON, ns = ...
-ns.VERSION = "0.1.1" -- keep equal to ## Version in PartySync.toc
+ns.VERSION = "0.1.2" -- keep equal to ## Version in PartySync.toc
 
 ------------------------------------------------------------------------
 -- Errors
