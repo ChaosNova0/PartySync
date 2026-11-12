@@ -1,0 +1,29 @@
+# Uploads each release to CurseForge (project 1800056) when a version
+# tag (v1.2.3) is pushed. The BigWigs packager builds the zip from the tagged
+# commit (.pkgmeta says what to leave out and where the changelog is) and
+# uploads it for the game version the .toc's Interface maps to (16001: WoW
+# Forever). Only CurseForge gets it: the GitHub release is made separately.
+# Needs the repository secret CF_API_KEY (a CurseForge API token).
+# (Copied from FableHub's workflow.)
+name: CurseForge
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: BigWigsMods/packager@e50a250f8705041e40f2fa1ddcb280a686d65aa0 # v2.6.1
+        with:
+          args: -p 1800056
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}

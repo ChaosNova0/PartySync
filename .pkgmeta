@@ -1,0 +1,18 @@
+# How the BigWigs packager builds the CurseForge upload
+# (.github/workflows/curseforge.yml). Leave out the same dev files that
+# .gitattributes keeps out of the GitHub release zip.
+package-as: PartySync
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+ignore:
+  - tests
+  - docs
+  - mockup
+  - CLAUDE.md
+  - .claude
+  - .github
+  - .luarc.json
+  - .wowluarc.json

@@ -10,3 +10,5 @@ tests/ export-ignore
 .claude/ export-ignore
 CLAUDE.md export-ignore
 *.tga binary
+.github/ export-ignore
+.pkgmeta export-ignore
