@@ -16,12 +16,13 @@
 --   Minimap.Place()       put it at the saved angle
 -- ns.ToggleMinimapButton()   hide it, or show it again (with a chat line)
 
-local _, ns = ...
+local ADDON, ns = ...
 local T = ns.Theme
 local MM = {}
 ns.Minimap = MM
 
-MM.ICON = "Interface\\AddOns\\PartySync\\Media\\logo.tga"
+-- (built from the folder name, so it still works if the folder was renamed)
+MM.ICON = "Interface\\AddOns\\" .. ADDON .. "\\Media\\logo.tga"
 MM.SIZE = 30  -- the button's width and height, in pixels
 MM.GAP = 8    -- how far its centre sits outside the minimap's edge
 

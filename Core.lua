@@ -478,7 +478,7 @@ function ns.PrintStatus()
 end
 
 local function PrintHelp()
-  ns.Print("/psync - open or close the panel / /psync status - your party and your quests / /psync sync - sync with your party again / /psync reset - put the panel back at the top of the screen / /psync minimap - show or hide the minimap button / /psync questie - Questie connection")
+  ns.Print("/psync - open or close the panel / /psync status - your party and your quests / /psync sync - sync with your party again / /psync reset - put the panel back at the top of the screen / /psync minimap - show or hide the minimap button / /psync questie - Questie connection / /psync debug - extra lines for reporting problems")
 end
 
 SLASH_PARTYSYNC1 = "/psync"
@@ -494,6 +494,12 @@ SlashCmdList.PARTYSYNC = function(msg)
     if ns.TogglePanel then ns.TogglePanel() else ns.Print("The panel is coming soon. Try /psync status for now.") end
   elseif msg == "status" then
     ns.Call(ns.PrintStatus)
+  elseif msg == "debug" then
+    -- (for this session only: extra chat lines, such as how party members'
+    -- names were matched; useful when reporting a problem)
+    ns.debug = not ns.debug
+    ns.Print(ns.debug and "Debug lines on until you log out or /reload. /psync debug again turns them off."
+      or "Debug lines off.")
   elseif msg == "questie" then
     if ns.QDB and ns.QDB.PrintStatus then ns.QDB.PrintStatus() else ns.Print("The Questie connection isn't built yet.") end
   else

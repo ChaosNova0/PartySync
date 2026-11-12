@@ -563,6 +563,18 @@ handlers.a = function(m, data)
   return false
 end
 
+-- A debug line about how a sender's name was (or wasn't) matched, once per
+-- name until the party changes. It shows the game's real spelling, which
+-- is what to look at if party members can't hear each other.
+local noted, notedCount = {}, 0
+ns.On("ROSTER_CHANGED", function() noted, notedCount = {}, 0 end)
+local function NoteSender(sender, what)
+  if not ns.debug or noted[sender] or notedCount >= 20 then return end
+  noted[sender] = true
+  notedCount = notedCount + 1
+  ns.Debug(what .. ": \"" .. ns.Escape(sender) .. "\"")
+end
+
 -- CHAT_MSG_ADDON. Everything here comes from another player, so it's
 -- checked step by step and anything odd is quietly dropped.
 function C.OnMessage(prefix, msg, channel, sender)
@@ -571,9 +583,13 @@ function C.OnMessage(prefix, msg, channel, sender)
   if type(msg) ~= "string" or #msg > W.MAX_MSG then return end
   if not G.Active() then return end
   -- exactly one party member who isn't us
-  local guid = G.Lookup(sender)
+  local guid, how = G.Lookup(sender)
   local m = guid and ns.members[guid]
-  if not m then return end
+  if not m then
+    if how ~= "self" then NoteSender(sender, "no party member matches the sender") end
+    return
+  end
+  if how ~= "exact" then NoteSender(sender, "matched the sender by " .. how .. " to " .. ns.Escape(m.name)) end
   if Flooding(guid) then return end
   -- (Decode removes "|", rejects control characters and checks every field)
   local kind, data = W.Decode(msg)

@@ -337,14 +337,26 @@ end
 --   - Muted after logging in, /reload or a party change, so what was already
 --     ready doesn't go off: for at least 10 s, and then until everyone is
 --     synced (at most 60 s). What's ready when the mute ends is the start.
---   - Once per quest while it stays ready; leaving ready allows it again.
+--   - Once per quest while it stays ready; leaving ready allows it again,
+--     but only ALERT_AGAIN seconds after its last alert (so a party member
+--     can't set it off over and over by flipping their quest back and forth).
+--   - A member who stays out of sync for STUCK seconds no longer holds it
+--     back (their copy keeps coming out wrong, so waiting won't help).
 -- It always prints a line in chat; Model.ShowAlert adds the big text in the
--- middle of the screen (the raid warning spot) and the ready-check sound.
+-- middle of the screen (the raid warning spot) and the ready-check sound,
+-- at most once every SHOW_GAP seconds.
 ------------------------------------------------------------------------
 Model.MUTE = 10
 Model.MUTE_MAX = 60
+Model.ALERT_AGAIN = 60
+Model.STUCK = 120
+Model.SHOW_GAP = 10
 local wasReady       -- [questID] = true: ready at the last sure check (nil: none yet)
 local alerted = {}   -- [questID] = true: alerted, and still ready since
+local alertedAt = {} -- [questID] = GetTime() of its last alert
+local unsyncedSince = {} -- [guid] = GetTime() when they were first seen out of sync
+local stuck = {}         -- [guid] = true: out of sync for STUCK seconds, left out
+local lastShown = -math.huge
 local muteStart = -math.huge
 
 -- are we sure we have this member's quests as they are now?
@@ -364,16 +376,27 @@ end
 -- is every online party member who has (or may have) PartySync synced?
 -- (members known to be without it, or on a protocol we can't read, don't
 -- count, and nor do silent ones once MayStillAnswer runs out)
+-- (second result: someone was just left out for being stuck)
 function Model.AllSynced()
   local now = GetTime()
-  for _, m in pairs(ns.members) do
+  local all, newlyStuck = true, false
+  for guid in pairs(unsyncedSince) do
+    if not ns.members[guid] then unsyncedSince[guid] = nil stuck[guid] = nil end
+  end
+  for guid, m in pairs(ns.members) do
     if m.hasAddon ~= false and (m.proto == nil or m.proto == ns.Wire.PROTO)
       and not Offline(m) and not Synced(m)
       and (m.hasAddon == true or MayStillAnswer(m, now)) then
-      return false
+      local since = unsyncedSince[guid]
+      if not since then since = now unsyncedSince[guid] = now end
+      if now < since + Model.STUCK then all = false
+      elseif not stuck[guid] then stuck[guid] = true newlyStuck = true end
+    else
+      unsyncedSince[guid] = nil
+      stuck[guid] = nil
     end
   end
-  return true
+  return all, newlyStuck
 end
 
 -- the IDs that are ready for everyone right now (every zone)
@@ -389,25 +412,34 @@ end
 function Model.CheckAlert()
   local now = GetTime()
   local ready = Model.ReadyIDs()
-  local synced = Model.AllSynced()
+  local synced, newlyStuck = Model.AllSynced()
   local muted = now < muteStart + Model.MUTE or (not synced and now < muteStart + Model.MUTE_MAX)
   if not synced then
     -- (not sure yet: keep the last sure answer. If the mute ran out before
     -- anyone was sure, what we have now becomes the start.)
     if not muted and not wasReady then wasReady = ready end
+    -- look again soon: nothing else may change before a stuck member's
+    -- STUCK seconds run out (this stops once everyone counts as synced)
+    ns.Coalesce("alertRecheck", 5, Model.CheckAlert)
     return
   end
   for id in pairs(alerted) do
     if not ready[id] then alerted[id] = nil end
   end
-  if muted or not wasReady then
+  for id, at in pairs(alertedAt) do
+    if now >= at + Model.ALERT_AGAIN then alertedAt[id] = nil end
+  end
+  -- (a member just left out: what's ready now becomes the start, as their
+  -- wrong copy may make old quests look newly ready)
+  if muted or not wasReady or newlyStuck then
     wasReady = ready
     return
   end
   local on = ns.db and ns.db.settings.alertDone
   for id in pairs(ready) do
-    if not wasReady[id] and not alerted[id] and on then
+    if not wasReady[id] and not alerted[id] and not alertedAt[id] and on then
       alerted[id] = true
+      alertedAt[id] = now
       local q = ns.mine.quests[id]
       local title = q and q.title or ("quest " .. id)
       ns.Print(("Everyone's done with %s. Time to hand it in!"):format(ns.Escape(title)))
@@ -425,6 +457,9 @@ end
 -- The big text and the sound. Both game functions are checked first and
 -- run under pcall: if the raid warning isn't there, the chat line is it.
 function Model.ShowAlert(questID, title)
+  local now = GetTime()
+  if now < lastShown + Model.SHOW_GAP then return end -- (the chat line is enough)
+  lastShown = now
   local text = ("Everyone's done with %s!"):format(ns.Escape(title or ("quest " .. tostring(questID))))
   if type(RaidNotice_AddMessage) == "function" and RaidWarningFrame then
     local colour = ChatTypeInfo and ChatTypeInfo.RAID_WARNING

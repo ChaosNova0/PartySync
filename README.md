@@ -56,6 +56,7 @@ Drag the title bar to move the window. Press Escape or click ✕ to close it. On
 | `/psync questie` | Whether QuestieDB was found and is working |
 | `/psync reset` | Put the window back at the top of the screen |
 | `/psync minimap` | Hide or show the minimap button |
+| `/psync debug` | Extra chat lines that help when reporting a problem (until you log out) |
 
 `/partysync` works as well. The gear button in the window has the settings:
 - the alert and its sound

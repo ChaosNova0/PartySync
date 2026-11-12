@@ -8,7 +8,7 @@
 -- Only plain textures and font strings are used, nothing secure, so every
 -- widget here works in combat.
 
-local _, ns = ...
+local ADDON, ns = ...
 local T = {}
 ns.Theme = T
 
@@ -16,7 +16,8 @@ ns.Theme = T
 -- It draws its letters smaller than most fonts at the same size, so we ask for it
 -- about 10% bigger (the sizes in the code stay as they are).
 -- If it can't be loaded, Arial Narrow is used instead, at the normal size.
-T.FONT = "Interface\\AddOns\\PartySync\\Media\\Fonts\\Questrial-Regular.ttf"
+-- (built from the folder name, so it still works if the folder was renamed)
+T.FONT = "Interface\\AddOns\\" .. ADDON .. "\\Media\\Fonts\\Questrial-Regular.ttf"
 T.FONT_SCALE = 1.1
 T.FALLBACK_FONT = "Fonts\\ARIALN.TTF"
 
